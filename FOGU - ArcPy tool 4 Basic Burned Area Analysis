@@ -6,6 +6,8 @@
 # Contact: costantino.pala.geo@proton.me
 #This script works on ArcMAP10.8.2 and should be tested on ArcGIS Pro
 
+# -*- coding: utf-8 -*-
+
 import arcpy
 import arcpy.sa as sa
 import tkinter as tk
@@ -26,17 +28,17 @@ print("Workspace set to:", arcpy.env.workspace)
 def FOGU():
     """
     Welcome to the FOGU module. Let's calculate NBR, dNBR, and draft maps for Burn Severity,
-    reclassified Burn Severity (PFES), and Wildfire perimeter. FOGU works only with 
-    Sentinel 2 L2A images! BANDS: 04, 08, 12
+    reclassified Burn Severity (PFES), and Wildfire perimeter. 
+    Works with any sensor providing NIR and SWIR bands!
     """
     arcpy.env.overwriteOutput = True
 
     # Percorsi di output specifici per FOGU
     outdir = arcpy.env.workspace + "\\"
-    obr8pre = outdir + "br8pre.tif"
-    obr12pre = outdir + "br12pre.tif"
-    obr8post = outdir + "br8post.tif"
-    obr12post = outdir + "br12post.tif"
+    onirpre = outdir + "nirpre.tif"
+    oswirpre = outdir + "swirpre.tif"
+    onirpost = outdir + "nirpost.tif"
+    oswirpost = outdir + "swirpost.tif"
     onbrpre = outdir +"nbrprefire.tif"
     onbrpost = outdir + "nbrpostfire.tif"
     odnbr = outdir + "dNBR.tif"
@@ -44,40 +46,40 @@ def FOGU():
     oreclassBS = outdir + "BURNSEVERITYCLASSESPFES.tif"
     owfp = outdir + "WILDFIREPERIMETER.tif"
 
-    # IMPORT SENTINEL IMAGES
-    print("Select the Prefire Band08 Sentinel 2 L2A image")
-    h = d.askopenfilename(title="Select the Prefire Band08 Sentinel 2 L2A image")
-    print("Select the Prefire Band12 Sentinel 2 L2A image")
-    i = d.askopenfilename(title="Select the Prefire Band12 Sentinel 2 L2A image")
-    print("Select the Postfire Band08 Sentinel 2 L2A image")
-    j = d.askopenfilename(title="Select the Postfire Band08 Sentinel 2 L2A image")
-    print("Select the Postfire Band12 Sentinel 2 L2A image")
-    k = d.askopenfilename(title="Select the Postfire Band12 Sentinel 2 L2A image")
+    # IMPORT IMAGES
+    print("Select the Prefire NIR image")
+    h = d.askopenfilename(title="Select the Prefire NIR image")
+    print("Select the Prefire SWIR image")
+    i = d.askopenfilename(title="Select the Prefire SWIR image")
+    print("Select the Postfire NIR image")
+    j = d.askopenfilename(title="Select the Postfire NIR image")
+    print("Select the Postfire SWIR image")
+    k = d.askopenfilename(title="Select the Postfire SWIR image")
     
-    arcpy.MakeRasterLayer_management(h, "Band 08 PREFIRE JP2")
-    arcpy.CopyRaster_management("Band 08 PREFIRE JP2", obr8pre, "", "", "", "", "", "64_BIT", "", "", "TIFF", "")
-    arcpy.MakeRasterLayer_management(obr8pre, "Band 08 PREFIRE TIF")
+    arcpy.MakeRasterLayer_management(h, "NIR PREFIRE ORIG")
+    arcpy.CopyRaster_management("NIR PREFIRE ORIG", onirpre, "", "", "", "", "", "64_BIT", "", "", "TIFF", "")
+    arcpy.MakeRasterLayer_management(onirpre, "NIR PREFIRE TIF")
     
-    arcpy.MakeRasterLayer_management(i, "Band 12 PREFIRE JP2")
-    arcpy.CopyRaster_management("Band 12 PREFIRE JP2", obr12pre, "", "", "", "", "", "64_BIT", "", "", "TIFF", "")
-    arcpy.MakeRasterLayer_management(obr12pre, "Band 12 PREFIRE TIF")
+    arcpy.MakeRasterLayer_management(i, "SWIR PREFIRE ORIG")
+    arcpy.CopyRaster_management("SWIR PREFIRE ORIG", oswirpre, "", "", "", "", "", "64_BIT", "", "", "TIFF", "")
+    arcpy.MakeRasterLayer_management(oswirpre, "SWIR PREFIRE TIF")
     
-    arcpy.MakeRasterLayer_management(j, "Band 08 POSTFIRE JP2")
-    arcpy.CopyRaster_management("Band 08 POSTFIRE JP2", obr8post, "", "", "", "", "", "64_BIT", "", "", "TIFF", "")
-    arcpy.MakeRasterLayer_management(obr8post, "Band 08 POSTFIRE TIF")
+    arcpy.MakeRasterLayer_management(j, "NIR POSTFIRE ORIG")
+    arcpy.CopyRaster_management("NIR POSTFIRE ORIG", onirpost, "", "", "", "", "", "64_BIT", "", "", "TIFF", "")
+    arcpy.MakeRasterLayer_management(onirpost, "NIR POSTFIRE TIF")
     
-    arcpy.MakeRasterLayer_management(k, "Band 12 POSTFIRE JP2")
-    arcpy.CopyRaster_management("Band 12 POSTFIRE JP2", obr12post, "", "", "", "", "", "64_BIT", "", "", "TIFF", "")
-    arcpy.MakeRasterLayer_management(obr12post, "Band 12 POSTFIRE TIF")
+    arcpy.MakeRasterLayer_management(k, "SWIR POSTFIRE ORIG")
+    arcpy.CopyRaster_management("SWIR POSTFIRE ORIG", oswirpost, "", "", "", "", "", "64_BIT", "", "", "TIFF", "")
+    arcpy.MakeRasterLayer_management(oswirpost, "SWIR POSTFIRE TIF")
 
     # PREFIRE
-    NBRpre = sa.Divide(sa.Minus("Band 08 PREFIRE TIF", "Band 12 PREFIRE TIF"), sa.Plus("Band 08 PREFIRE TIF", "Band 12 PREFIRE TIF"))
+    NBRpre = sa.Divide(sa.Minus("NIR PREFIRE TIF", "SWIR PREFIRE TIF"), sa.Plus("NIR PREFIRE TIF", "SWIR PREFIRE TIF"))
     NBRpre.save(onbrpre)
     arcpy.MakeRasterLayer_management(onbrpre, "NBR PREFIRE")
     print("FOGU: FINISHED - 1 PREFIRE NBR")
 
     # POSTFIRE
-    NBRpost = sa.Divide(sa.Minus("Band 08 POSTFIRE TIF", "Band 12 POSTFIRE TIF"), sa.Plus("Band 08 POSTFIRE TIF", "Band 12 POSTFIRE TIF"))
+    NBRpost = sa.Divide(sa.Minus("NIR POSTFIRE TIF", "SWIR POSTFIRE TIF"), sa.Plus("NIR POSTFIRE TIF", "SWIR POSTFIRE TIF"))
     NBRpost.save(onbrpost)
     arcpy.MakeRasterLayer_management(onbrpost, "NBR POSTFIRE")
     print("FOGU: FINISHED - 2 POSTFIRE NBR")
@@ -114,5 +116,4 @@ def FOGU():
     arcpy.MakeRasterLayer_management(owfp, "Wildfire Perimeter")
     print("FOGU: FINISHED - 6 Wildfire Perimeter drafting")
 
-# Per avviare il tool basta chiamare la funzione
-# FOGU()
+# Launch with FOGU()
