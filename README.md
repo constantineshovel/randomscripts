@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="randomscripts.png" width="400">
+</p>
+
 # randomscripts
 
 A collection of utilities for geoscience workflows. These are functional scripts developed to automate repetitive tasks and process data across various geological domains.
