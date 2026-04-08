@@ -8,7 +8,7 @@ A collection of utilities for geoscience workflows. These are functional scripts
 
 ### Requirements
 * **Python 3.x**
-* **ArcPy** (for GIS-specific scripts)
+* **ArcPy** (for some GIS-specific scripts)
 * Check individual script headers for specific library dependencies (Pandas, NumPy, etc.).
 
 ### Usage
