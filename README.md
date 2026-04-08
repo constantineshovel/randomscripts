@@ -1,2 +1,11 @@
 # randomscripts
-This repository contains scripts i produced during my work. Feel free to use and if you want follow me!
+
+A collection of utilities for geoscience workflows. These are functional scripts developed to automate repetitive tasks and process data across various geological domains.
+
+### Requirements
+* **Python 3.x**
+* **ArcPy** (for GIS-specific scripts)
+* Check individual script headers for specific library dependencies (Pandas, NumPy, etc.).
+
+### Usage
+Scripts are designed to be standalone. Clone the repo and run the specific utility needed for your workflow. No complex installation required.
