@@ -21,3 +21,7 @@ INUE: The ArcPY version of INUE [ArcPy]
 FOGU: Basic Burned Area Analysis based on multispectral imagery. Burn Severity based on Keeley et al. 2009 [ArcPy]
 
 IC and Watershed: Calculates the IC index proposed by Borselli et al 2008 and delineates the watersheds... [ArcPy]
+
+## Warning
+
+If you have ideas for scripts, spot any inaccuracies, bugs, or—even worse—wrong citations, don't hesitate to reach out! I'll fix them ASAP. Suggestions will be evaluated and possibly implemented.
