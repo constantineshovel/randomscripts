@@ -13,3 +13,9 @@ A collection of utilities for geoscience workflows. These are functional scripts
 
 ### Usage
 Scripts are designed to be standalone. Clone the repo and run the specific utility needed for your workflow. No complex installation required.
+
+## Tools
+
+INUE: The ArcPY version of INUE [ArcPy]
+FOGU: Basic Burned Area Analysis based on multispectral imagery. Burn Severity based on Keeley et al. 2009 [ArcPy]
+IC and Watershed: Calculates the IC index proposed by Borselli et al 2008 and delineates the watersheds... [ArcPy]
