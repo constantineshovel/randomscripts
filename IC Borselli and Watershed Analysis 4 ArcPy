@@ -1,0 +1,411 @@
+# -*- coding: utf-8 -*-
+# ---------------------------------------------------------------------------
+# RANDOMSCRIPTS 4 GEOSCIENCES by ConstantineShovel
+# https://github.com/constantineshovel/randomscripts
+# Created on: October 2024
+# Author: Costantino Pala, PhD student at Cagliari State University (Sardinia) 
+# Contact: costantino.pala.geo@proton.me
+# This script works on ArcMAP 10.8.2 and should be tested on ArcGIS Pro
+#
+# Usage:
+#     IC(dem_unit, algorithm, Wsett) - Calculates the Sediment Connectivity Index
+#     RIU() - Drafts watersheds and river networks
+#
+# Description:
+# It calculates:
+#     - Sediment Connectivity Index (IC) as proposed by Borselli et al. (2008), 
+#       with roughness index modification from Cavalli et al. (2013)
+#     - drafts watersheds and river networks...
+# ---------------------------------------------------------------------------
+
+import arcpy
+import arcpy.sa as sa
+import tkinter as tk
+import tkinter.filedialog as d
+
+#______________________WELCOME & SETUP_______________________
+
+root = tk.Tk()
+root.withdraw()
+print("Select the folder where to save the files")
+arcpy.env.workspace = d.askdirectory(title="Select Folder to Save Files")
+arcpy.env.workspace = arcpy.env.workspace.replace('/', '\\')
+arcpy.env.overwriteOutput = True
+
+try:
+    import arcpy.mapping as map 
+    mxd = map.MapDocument("CURRENT")
+    adf = mxd.activeDataFrame
+except:
+    print("Not running inside ArcMap UI. Mapping functions tied to 'CURRENT' will be skipped.")
+
+print("Workspace set to: " + arcpy.env.workspace)
+print('Now call one of the modules. Type help("commands") to discover all the available modules')
+
+#_________________________CHANGING OUTPUT FOLDER_______________________
+
+def ammenta():
+    print("Select the folder where you want to save the files")
+    arcpy.env.workspace = d.askdirectory(title="Select Folder to Save Files") 
+    arcpy.env.workspace = arcpy.env.workspace.replace('/', '\\') 
+    print("The new output folder is:", arcpy.env.workspace)
+    print("Now call one of the modules and go take a coffee, you deserve it.")
+
+#_________________________USER GUIDE___________________________________
+
+def help(module):
+    if module == "IC":
+        print('Welcome to the IC User Guide. IC calculates the sediment connectivity index (Borselli et al. 2008 / Cavalli et al. 2013).')
+        print('Usage: IC("METER", "DINF")')
+        print('DEM UNITS: "INCH", "FOOT", "YARD", "MILE_US", "METER", "KILOMETER", etc.')
+        print('Algorithms: "D8", "DINF"')
+    elif module == "RIU":
+        print("Welcome to RIU. Drafts watersheds and river networks. Call the function using RIU().")
+    elif module == "commands":
+        print("Available commands: IC(dem_unit, alg, Wsett), RIU(), help(module), ammenta()")
+    elif module == "ABOUT":
+        print("References: Borselli et al. (2008), Cavalli et al. (2013), Riley et al. (1999).")
+
+#_________________________MODULES______________________________________
+
+def WINDEX(newmin=0.05, newmax=1, nodatavalue=1):
+    arcpy.env.overwriteOutput = True
+    l = d.askopenfilename(title="Select the Raster to be reclassified")
+    arcpy.MakeRasterLayer_management(l, "Raster to be reclassified")
+
+    outdir = arcpy.env.workspace + "\\"
+    PWIndex = outdir + "PersonalWindex.tif"
+
+    print("W Module 1: nodata reclassifier")
+    rr = sa.Con(sa.IsNull("Raster to be reclassified"), nodatavalue, "Raster to be reclassified")
+    rr.save(PWIndex)
+    arcpy.MakeRasterLayer_management(PWIndex, "W8")
+    print("W Module 1 - Finished")
+
+
+def IC(dem_unit="METER", alg="D8", Wsett="Default", newmin=0.05, newmax=1, nodatavalue=1):
+    arcpy.env.overwriteOutput = True 
+    outdir = arcpy.env.workspace + "\\"
+    
+    # OUTPUT PATHS
+    icfilldem = outdir + "oicfilldem.tif"
+    oFLOWDIR = outdir + "FlowDir.tif"
+    oDIRMASK = outdir + "dirmask.tif"
+    oACCMASK = outdir + "accmask.tif"
+    oRIVERMASK = outdir + "rivermask.tif"
+    oDIRFINAL = outdir + "dirfinal.tif"
+    oMEANDEM = outdir + "meandem.tif"
+    oRESTOPO = outdir + "restopo.tif"
+    oW = outdir + "W.tif"
+    oACCSEMIFINAL = outdir + "accsemifinal.tif"
+    oACCFinal = outdir + "accfinal.tif"
+    oWFMean = outdir + "WFMean.tif"
+    oWemiMean = outdir + "WemiMean.tif"
+    oWMean = outdir + "wmean.tif"
+    oSLOPE = outdir + "slope.tif"
+    oS = outdir + "S.tif"
+    oSFMean = outdir + "SFMean.tif"
+    oSemiMean = outdir + "SemiMean.tif"
+    oSMean = outdir + "smean.tif"
+    oWSMeans = outdir + "WSMeans.tif"
+    oACCFinal25 = outdir + "ACCFinal25.tif"
+    oDup = outdir + "DUP.tif"
+    oWS16 = outdir + "ws16.tif"
+    oinv_WS = outdir + "invws.tif"
+    oX = outdir + "x.tif"
+    oX0 = outdir + "X0.tif"
+    oDdn = outdir + "DDN.tif"
+    odupddn = outdir + "dupddn.tif"
+    oIC = outdir + "SedimentConnectivityIndex.tif"
+    onormalizedIC = outdir + "normalizedIC.tif"
+
+    print("Select Digital Elevation Model in TIF format")
+    a = d.askopenfilename(title="Select Digital Elevation Model")
+    arcpy.MakeRasterLayer_management(a, "DEM")
+    print("Select ROADMASK in TIF format")
+    b = d.askopenfilename(title="Select ROADMASK")
+    arcpy.MakeRasterLayer_management(b, "ROADMASK")
+
+    # 0. FILL DEM
+    filled_dem = sa.Fill("DEM")
+    filled_dem.save(icfilldem)
+    arcpy.MakeRasterLayer_management(icfilldem, "FILLDEM")
+    print("FINISHED - FILL DEM")
+
+    # 1 FLOW DIRECTION
+    FLOWDIR = sa.FlowDirection("FILLDEM", "NORMAL", "", alg)
+    FLOWDIR.save(oFLOWDIR)
+    arcpy.MakeRasterLayer_management(oFLOWDIR, "FLOWDIR1")
+    print("FINISHED - 1 FLOW DIRECTION")
+
+    # 2 DIRMASK
+    DIRMASK = sa.Times("FLOWDIR1", "ROADMASK")
+    DIRMASK.save(oDIRMASK)
+    arcpy.MakeRasterLayer_management(oDIRMASK, "DIRMASK2")
+    print("FINISHED - 2 DIRMASK")
+
+    # 3 ACCMASK
+    ACCMASK = sa.FlowAccumulation("DIRMASK2", "", "FLOAT", alg)
+    ACCMASK.save(oACCMASK)
+    arcpy.MakeRasterLayer_management(oACCMASK, "ACCMASK3")
+    print("FINISHED - 3 ACCMASK")
+
+    # 4 RIVERMASK
+    RIVERMASK = sa.LessThan("ACCMASK3", 1000)
+    RIVERMASK.save(oRIVERMASK)
+    arcpy.MakeRasterLayer_management(oRIVERMASK, "RIVERMASK4")
+    print("FINISHED - 4 RIVERMASK")
+
+    # 5 DIRFINAL
+    DIRFINAL = sa.Times("DIRMASK2", "RIVERMASK4")
+    DIRFINAL.save(oDIRFINAL)
+    arcpy.MakeRasterLayer_management(oDIRFINAL, "DIRFINAL5")
+    print("FINISHED - 5 DIRFINAL")
+
+    if Wsett == "Cavalli2008":
+        MEANDEM = sa.FocalStatistics("DEM", sa.NbrRectangle(5,5, "CELL"),"MEAN", "DATA", 90)
+        MEANDEM.save(oMEANDEM)
+        arcpy.MakeRasterLayer_management(oMEANDEM, "MEANDEM6")
+        
+        RESTOPO = sa.Minus("DEM", "MEANDEM6")
+        RESTOPO.save(oRESTOPO)
+        arcpy.MakeRasterLayer_management(oRESTOPO, "RESTOPO7")
+        
+        W = sa.FocalStatistics("RESTOPO7", sa.NbrRectangle(5,5, "CELL"),"STD", "DATA", 90)
+        W.save(oW)
+        arcpy.MakeRasterLayer_management(oW, "W6")
+        print("FINISHED - 6 W roughness index: Cavalli et al. 2008")
+    
+    elif Wsett == "WINDEX":
+        WINDEX(newmin, newmax, nodatavalue)
+        print("FINISHED - 6 Windex")
+
+    elif Wsett == "Default":
+        print("Calculating Roughness index based on DEM with a 5x5 moving window (Standard Deviation)")
+        W = sa.FocalStatistics("DEM", sa.NbrRectangle(5,5, "CELL"),"STD", "DATA", 90)
+        W.save(oW)
+        arcpy.MakeRasterLayer_management(oW, "W6")
+        print("FINISHED 6 - Default W roughness index")
+        
+    elif Wsett == "personalized":
+        print("Select your own W Index")
+        icwper = d.askopenfilename(title="Select Raster for W Index")
+        arcpy.MakeRasterLayer_management(icwper, "W6")
+        print("FINISHED - 6 Personalized W Index successfully loaded")
+        
+    elif Wsett == "TRIRiley1999":
+        print("Calculating Topographic Roughness Index (TRI) following Riley et al., 1999")
+        focal_mean = sa.FocalStatistics("DEM", sa.NbrRectangle(3, 3, "CELL"), "MEAN", "DATA")
+        focal_mean.save(outdir + "r9fm.tif") 
+        abs_diff = sa.Abs(sa.Minus("DEM", focal_mean))
+        abspa = outdir + "abspa.tif"
+        abs_diff.save(abspa)
+        TRI = sa.FocalStatistics(abspa, sa.NbrRectangle(3, 3, "CELL"), "SUM", "DATA")
+        TRIsavepath = outdir + "TRIriley99.tif"
+        TRI.save(TRIsavepath)
+        arcpy.MakeRasterLayer_management(TRIsavepath, "W6")
+        print("FINISHED - 6 Topographic Roughness Index by Riley et al. 1999")
+
+    elif Wsett == "TRI2":
+        print("Calculating Topographic Roughness Index starting from your DEM")
+        parFS = ["MEAN", "MAXIMUM", "MINIMUM"]
+        outFSa = ["FSmean.tif", "FSmax.tif", "FSmin.tif"]
+        FSnames = ["FSmean", "FSmax", "FSmin"]
+        
+        for i in range(3):
+            FSo = sa.FocalStatistics("DEM", sa.NbrRectangle(5,5, "CELL"), parFS[i], "DATA", 90)
+            savepathFS = outdir + outFSa[i]
+            FSo.save(savepathFS)
+            arcpy.MakeRasterLayer_management(savepathFS, FSnames[i])
+            
+        TRI = sa.Divide(sa.Minus("FSmean", "FSmin"), sa.Minus("FSmax", "FSmin"))
+        TRIsave = outdir + "TRI.tif"
+        TRI.save(TRIsave)
+        arcpy.MakeRasterLayer_management(TRIsave, "W6")
+        print("FINISHED - 6 Topographic Roughness Index")
+
+    # 7 accsemifinal
+    ACCSEMIFINAL = sa.FlowAccumulation("DIRFINAL5", "", "FLOAT", alg)
+    ACCSEMIFINAL.save(oACCSEMIFINAL)
+    arcpy.MakeRasterLayer_management(oACCSEMIFINAL, "ACCSEMIFINAL7")
+    print("FINISHED - 7 ACCSEMIFINAL")
+
+    # 8 ACCFinal
+    ACCFinal = sa.Plus("ACCSEMIFINAL7", 1)
+    ACCFinal.save(oACCFinal)
+    arcpy.MakeRasterLayer_management(oACCFinal, "ACCFINAL8")
+    print("FINISHED - 8 ACCFINAL")
+
+    # 9 Process: Wmean
+    WFMean = sa.FlowAccumulation("DIRFINAL5", "W6", "FLOAT", alg)
+    WFMean.save(oWFMean)
+    arcpy.MakeRasterLayer_management(oWFMean, "9a WFMean")
+
+    WemiMean = sa.Plus("9a WFMean", "W6")
+    WemiMean.save(oWemiMean)
+    arcpy.MakeRasterLayer_management(oWemiMean, "9b WemiMean")
+
+    WMean = sa.Divide("9b WemiMean", "ACCFINAL8")
+    WMean.save(oWMean)
+    arcpy.MakeRasterLayer_management(oWMean, "9 WMean")
+    print("FINISHED - 9 WMean")
+
+    # 10 Process: Slope
+    SLOPE = sa.Slope("DEM", "DEGREE", "1", "PLANAR", dem_unit)
+    SLOPE.save(oSLOPE)
+    arcpy.MakeRasterLayer_management(oSLOPE, "10 SLOPE")
+    print("FINISHED - 10 SLOPE") 
+
+    # 11 Process: S
+    S = sa.Con("10 SLOPE", 0.005, "10 SLOPE", "value = 0")
+    S.save(oS)
+    arcpy.MakeRasterLayer_management(oS, "11 S")
+    print("FINISHED - 11 S")
+
+    # 12 Process: Smean
+    SFMean = sa.FlowAccumulation("DIRFINAL5", "11 S", "FLOAT", alg)
+    SFMean.save(oSFMean)
+    arcpy.MakeRasterLayer_management(oSFMean, "12a SFMean")
+
+    SemiMean = sa.Plus("12a SFMean", "11 S")
+    SemiMean.save(oSemiMean)
+    arcpy.MakeRasterLayer_management(oSemiMean, "12b SemiMean")
+
+    SMean = sa.Divide("12b SemiMean", "ACCFINAL8")
+    SMean.save(oSMean)
+    arcpy.MakeRasterLayer_management(oSMean, "12 SMean")
+    print("FINISHED - 12 SMean") 
+
+    print("Input files for IC calculation are ready. Let's move on with Dup and Ddn")
+    
+    # 13 Process: Dup
+    WSMeans = sa.Times("9 WMean", "12 SMean")
+    WSMeans.save(oWSMeans)
+    arcpy.MakeRasterLayer_management(oWSMeans, "13a WSMeans")
+
+    ACCFinal25 = sa.Times("ACCFINAL8", 25)
+    ACCFinal25.save(oACCFinal25)
+    arcpy.MakeRasterLayer_management(oACCFinal25, "13b ACCFinal25")
+
+    Dup = sa.Times("13a WSMeans", sa.SquareRoot("13b ACCFinal25"))
+    Dup.save(oDup)
+    arcpy.MakeRasterLayer_management(oDup, "13 Dup")
+    print("FINISHED - 13 Dup")
+
+    # 14 Process: inv_WS
+    WSinv = sa.Times("W6", "11 S")
+    WSinv.save(oWS16)
+    arcpy.MakeRasterLayer_management(oWS16, "14 a WSinv")
+    
+    inv_WS = sa.Divide(1, "14 a WSinv")
+    inv_WS.save(oinv_WS)
+    arcpy.MakeRasterLayer_management(oinv_WS, "14 inv_WS")
+    print("FINISHED - 14 inv_WS")	
+
+    # 15 Process X
+    X = sa.FlowLength("DIRFINAL5", "DOWNSTREAM", "14 inv_WS")
+    X.save(oX)
+    arcpy.MakeRasterLayer_management(oX, "15 X")
+    print("FINISHED - 15 X")
+
+    # 16 Process: Ddn 
+    X0 = sa.Con("15 X", "14 inv_WS" , "15 X", "value = 0")
+    X0.save(oX0)
+    arcpy.MakeRasterLayer_management(oX0, "15a X0")
+ 
+    Ddn = sa.Plus("15a X0", "15 X")
+    Ddn.save(oDdn)
+    arcpy.MakeRasterLayer_management(oDdn, "16 Ddn")
+    print("FINISHED - 16 Ddn")
+    
+    print("Calculating Sediment Connectivity Index IC (Borselli et al. 2008)")
+
+    # 17 Process: Index of Connectivity 
+    dupddn = sa.Divide("13 Dup", "16 Ddn")
+    dupddn.save(odupddn)
+    arcpy.MakeRasterLayer_management(odupddn, "DupDdn")
+    
+    IC_result = sa.Log10("DupDdn")
+    IC_result.save(oIC)
+    arcpy.MakeRasterLayer_management(oIC, "17 Index of Connectivity")
+    print("FINISHED - 17 Sediment Connectivity Index (IC)")
+
+    # 18 Process: calculates normalized IC
+    min_IC = arcpy.GetRasterProperties_management("17 Index of Connectivity", "MINIMUM", "Band_1")
+    max_IC = arcpy.GetRasterProperties_management("17 Index of Connectivity", "MAXIMUM", "Band_1")
+    normalized_IC = sa.RescaleByFunction(oIC, sa.TfLinear(min_IC, max_IC), 0, 1)
+    normalized_IC.save(onormalizedIC)
+    arcpy.MakeRasterLayer_management(onormalizedIC, "18 normalized Index of Connectivity")
+    print("FINISHED - 18 normalized IC")
+
+
+def RIU():
+    arcpy.env.overwriteOutput = True
+    outdir = arcpy.env.workspace + "\\"
+    
+    # OUTPUT PATHS
+    oFILLED = outdir + "oFILLED.tif"
+    oFLOWDIRE = outdir + "oFLOWDIRE.tif"
+    oACCFLOW = outdir + "oACCFLOW.tif"
+    oRIVNET = outdir + "oRIVNET.tif"
+    nodtif = outdir + "nodtif.tif"
+    conodtif = outdir + "conodtif.tif"
+    norgtif = outdir + "norgtif.tif"
+    oBASIN = outdir + "oBASIN.tif"
+    obasinshape = outdir + "basin_shapefile_output.shp"
+    orivershape = outdir + "RIVERNETWORK.shp"
+
+    dem_file = d.askopenfilename(title="Select a Digital Elevation Model")  
+    if not dem_file:
+        print("No file selected. Exiting.")
+        return
+
+    arcpy.MakeRasterLayer_management(dem_file, "RIUDEM")
+
+    # 1. FILL DEM
+    filled_dem = sa.Fill("RIUDEM")
+    filled_dem.save(oFILLED)
+    arcpy.MakeRasterLayer_management(oFILLED, "RIU 1 - FILLED DEM")
+    print("RIU, module 1 finished: filled DEM")
+
+    # 2. FLOW DIRECTION
+    flow_direction = sa.FlowDirection("RIU 1 - FILLED DEM", "NORMAL", "", "D8")
+    flow_direction.save(oFLOWDIRE)
+    arcpy.MakeRasterLayer_management(oFLOWDIRE, "RIU 2 - FLOW DIRECTION")
+    print("RIU, module 2 finished: flow direction")
+
+    # 3. FLOW ACCUMULATION
+    flow_accumulation = sa.FlowAccumulation("RIU 2 - FLOW DIRECTION", "", "FLOAT", "D8")
+    flow_accumulation.save(oACCFLOW)
+    arcpy.MakeRasterLayer_management(oACCFLOW, "RIU 3 - FLOW ACCUMULATION")
+    print("RIU, module 3 finished: flow accumulation")
+
+    # 4. RIVER NETWORK
+    river_network = sa.LessThan("RIU 3 - FLOW ACCUMULATION", 1000.00)
+    river_network.save(oRIVNET)
+    arcpy.MakeRasterLayer_management(oRIVNET, "RIU 4 - RIVER NETWORK")
+    print("RIU, module 4 finished: river network")
+
+    # 5. POURPOINT PATHFINDER
+    nodes = sa.FocalStatistics("RIU 4 - RIVER NETWORK", sa.NbrRectangle(3,3, "CELL"), "MAJORITY", "DATA", 90)
+    nodes.save(nodtif)
+    arcpy.MakeRasterLayer_management(nodtif, "NODES")
+    
+    conodes = sa.Con("NODES", "NODES" , "", "value = 0")
+    conodes.save(conodtif)
+    arcpy.MakeRasterLayer_management(conodtif, "CONODES")
+    
+    norg = sa.RegionGroup("CONODES", "EIGHT", "WITHIN", "ADD_LINK", "")
+    norg.save(norgtif)
+    arcpy.MakeRasterLayer_management(norgtif, "Pour Points")
+
+    # 6. BASIN
+    basin = sa.Watershed("RIU 2 - FLOW DIRECTION", "Pour Points", "Value")
+    basin.save(oBASIN)
+    arcpy.MakeRasterLayer_management(oBASIN, "RIU 6 - WATERSHEDS")
+    print("RIU, module 6 finished: watershed delineation")
+
+    # 7. SHAPEFILE CONVERSION
+    arcpy.RasterToPolygon_conversion("RIU 6 - WATERSHEDS", obasinshape, "NO_SIMPLIFY", "Value")
+    arcpy.RasterToPolyline_conversion("RIU 4 - RIVER NETWORK", orivershape, "NO_SIMPLIFY", "Value")
+    print("RIU: module 7 finished: Watershed and River network shapefiles")
