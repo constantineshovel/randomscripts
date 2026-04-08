@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="randomscripts.png" width="400">
+  <img src="randomscripts logo.png" width="400">
 </p>
 
 # randomscripts
