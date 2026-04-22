@@ -7,7 +7,7 @@
 A collection of utilities for geoscience workflows. These are functional scripts developed to automate repetitive tasks and process data across various geological domains.
 
 ### Requirements
-* **Python 3.x**
+* **Python 2.7.x and 3.x**
 * **ArcPy** (for some GIS-specific scripts)
 * Check individual script headers for specific library dependencies (Pandas, NumPy, etc.).
 
